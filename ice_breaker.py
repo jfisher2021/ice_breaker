@@ -6,14 +6,14 @@ from third_parties.linkedin import scrape_linkedin_profile
 from agents.linkedin_lookup_agent import lookup as linkedin_lookup_agent
 from agents.twitter_lookup_agent import lookup as twitter_lookup_agent
 from third_parties.twitter import scrape_user_tweets
-
+from output_parsers import summary_parser
 
 def ice_break_with(name: str) -> str:
     linkedin_username = linkedin_lookup_agent(name=name)
-    linkedin_data = scrape_linkedin_profile(linkedin_profile_url=linkedin_username)
+    linkedin_data = scrape_linkedin_profile(linkedin_profile_url=linkedin_username, mock=True)
 
     twitter_username = twitter_lookup_agent(name=name)
-    tweets = scrape_user_tweets(username=twitter_username)
+    tweets = scrape_user_tweets(username=twitter_username, mock=True)
 
     summary_template = """
     given the information about a person from linkedin {information},
@@ -22,14 +22,17 @@ def ice_break_with(name: str) -> str:
     2. two interesting facts about them 
 
     Use both information from twitter and Linkedin
+    \n{format_instruction}
     """
     summary_prompt_template = PromptTemplate(
-        input_variables=["information", "twitter_posts"], template=summary_template
+        input_variables=["information", "twitter_posts"], 
+        template=summary_template,
+        partial_variables={"format_instruction": summary_parser.get_format_instructions()}
     )
 
     llm = ChatOpenAI(temperature=0, model_name="gpt-4o-mini")
 
-    chain = summary_prompt_template | llm
+    chain = summary_prompt_template | llm | summary_parser 
 
     res = chain.invoke(input={"information": linkedin_data, "twitter_posts": tweets})
 
